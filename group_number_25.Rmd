@@ -1,0 +1,1250 @@
+---
+title: "Group number 25"
+---
+title: "assignment_aip"
+output: html_document
+date: "2023-11-25"
+---
+
+```{r setup, include=FALSE}
+#install.packages("tidyverse")
+library(tidyverse)
+#install.packages("dplyr")
+library(dplyr)
+#install.packages("mice")
+library(mice)
+#install.packages("GGally")
+library(GGally)
+#install.packages("lattice")
+library("lattice")
+#install.packages("ROSE")
+library(ROSE)
+#install.packages("e1071")
+library(e1071)
+#install.packages("randomForest")
+library(randomForest)
+#install.packages("randomForestSRC")
+library(randomForestSRC)
+#install.packages("party")
+library(party)
+#install.packages("data.table")
+library(data.table)
+#install.packages("mltools")
+library(mltools)
+#install.packages("woe")
+library(woe)
+#install.packages("FSelector")
+library(FSelector)
+#install.packages("dummy")
+library(dummy)
+#install.packages("performanceEstimation")
+library(performanceEstimation)
+#install.packages("rpart")
+library(rpart)
+#install.packages("rpart.plot")
+library(rpart.plot)
+#install.packages("class")
+library(class)
+#install.packages("splitstackshape")
+library(splitstackshape)
+#install.packages("xgboost")
+library(xgboost)
+#install.packages("lattice")
+library(caret)
+# Load the ROCR package for ROC chart
+library(pROC) 
+#install.packages("CustomerScoringMetrics")
+library(CustomerScoringMetrics)
+```
+
+## Data preparetion
+```{r}
+df <- read.csv("assignment_data.csv")
+#check the structure of df
+str(df)
+
+#see the first 6 rows of df
+head(df, 6)
+
+#set the correct levels or data type
+column <- c("Gender", "Dependent", "Marital_Status", "Region_Code", "Occupation", "Channel_Code","Credit_Product", "Account_Type","Active", "Registration", "Target")
+df[column] <- lapply(df[column], as.factor)
+str(df)
+
+#remove irrelavented variable
+df <- df %>%
+  select(-ID)
+
+#check the duplicated data
+duplicated_rows <- df[duplicated(df), ]
+
+```
+
+## Data visualization analysis
+```{r}
+# continuous variables
+## pair plot
+continuous_data <- data.frame(Age = df$Age, Years_at_Residence = df$Years_at_Residence, Vintage = df$Vintage, Avg_Account_Balance = df$Avg_Account_Balance)
+pairs_plot <- ggpairs(continuous_data,
+                      aes(color = df$Target, alpha = 0.6),
+                      lower = list(continuous = "points"),
+                      diag = list(continuous = "densityDiag"),
+                      upper = list(continuous = "cor")
+                      )
+
+pairs_plot <- ggpairs(continuous_data,
+                      aes(color = df$Target, alpha = 0.6),
+                      upper = list(continuous = wrap("cor", size = 3)),
+                      lower = list(continuous = wrap("points", alpha = 0.5, size = 0.1)),
+                      diag = list(continuous = wrap("densityDiag", size = 0.5, alpha = 0.5)),
+                      axisLabels = 'show')+
+  ggtitle("Pair Plot of Continuous Variables") +
+  theme(legend.position = "bottom")
+# Print the plot
+print(pairs_plot)
+```
+
+
+```{r}
+## Histogram Diagram
+ggplot(df, aes(Age))+
+  geom_histogram(aes(y=..density..), fill = "#6495ED", binwidth = 1)+
+  geom_density(color = "red")+
+  labs(title = "Histogram of Age", x = "Age",y = "Density")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(df, aes(Vintage))+
+  geom_histogram(aes(y=..density..), fill = "#6495ED", binwidth = 3)+
+  geom_density(color = "red")+
+  labs(title = "Histogram of Vintage", x = "Vintage",y = "Density")+
+  theme(plot.title = element_text(hjust = 0.5))  
+
+ggplot(df, aes(Avg_Account_Balance))+
+  geom_histogram(aes(y=..density..), fill = "#6495ED", binwidth = 3000)+
+  geom_density(color = "red")+
+  labs(title = "Histogram of Average Account Balance", x = "Average Account Balance",y = "Density")+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+```{r}
+## Heatmap
+matrix_data <- data.frame(Age = df$Age, Vintage = df$Vintage, Avg_Account_Balance = df$Avg_Account_Balance, Target = as.numeric(df$Target))
+matrix_data <- cor(matrix_data)
+
+panel_set <- function(x, y, z, ...) {
+  panel.levelplot(x, y, z, ...)
+  panel.text(x, y, round(z, 2), cex = 0.7)}
+heatmap_plot <- levelplot(t(matrix_data[nrow(matrix_data):1, ]),
+                          panel = panel_set,
+                          scales=list(x=list(rot=90)),
+                          col.regions=colorRampPalette(c("dodgerblue4", "white", "firebrick3"))(100),
+                          xlab = NULL,
+                          ylab = NULL,
+                          main = list(label = "Correlation Heatmap", position = "bottom", just = "center"),
+                          )
+print(heatmap_plot)
+```
+
+
+```{r}
+# Categorical Variable
+ggplot(df, aes(x = factor(Dependent), fill = factor(Target))) +
+  geom_bar(position = "dodge")+
+  geom_text(stat = 'count', aes(label=..count..), position=position_dodge(width=0.9), vjust=-0.25)+
+  labs(x = "Dependent", fill = "Target")
+
+ggplot(df, aes(x = factor(Marital_Status), fill = factor(Target))) +
+  geom_bar(position = "dodge")+
+  geom_text(stat = 'count', aes(label=..count..), position=position_dodge(width=0.9), vjust=-0.25)+
+  labs(x = "Marital_Status", fill = "Target")
+
+ggplot(df, aes(x = factor(Years_at_Residence), fill = factor(Target)))+
+  geom_bar(position = "dodge")+
+  geom_text(stat = 'count', aes(label=..count..), position=position_dodge(width=0.9), vjust=-0.25)+
+  labs(x = "Years_at_Residence", fill = "Target")
+
+ggplot(df, aes(x = factor(Occupation), fill = factor(Target))) +
+  geom_bar(position = "dodge")+
+  geom_text(stat = 'count', aes(label=..count..), position=position_dodge(width=0.9), vjust=-0.25)+
+  labs(x = "Occupation", fill = "Target")
+
+ggplot(df, aes(x = factor(Credit_Product), fill = factor(Target))) +
+  geom_bar(position = "dodge")+
+  geom_text(stat = 'count', aes(label=..count..), position=position_dodge(width=0.9), vjust=-0.25)+
+  labs(x = "Credit_Product", fill = "Target")  
+
+ggplot(df, aes(x = factor(Account_Type), fill = factor(Target))) +
+  geom_bar(position = "dodge")+
+  geom_text(stat = 'count', aes(label=..count..), position=position_dodge(width=0.9), vjust=-0.25)+
+  labs(x = "Account_Type", fill = "Target")
+
+ggplot(df, aes(x = factor(Registration), fill = factor(Target))) +
+  geom_bar(position = "dodge")+
+  geom_text(stat = 'count', aes(label=..count..), position=position_dodge(width=0.9), vjust=-0.25)+
+  labs(x = "Registration", fill = "Target")  
+
+ggplot(df, aes(x = factor(Region_Code), fill = factor(Target))) +
+  geom_bar(position = "dodge")+
+  geom_text(stat = 'count', aes(label=..count..), position=position_dodge(width=0.05), vjust=-0.25)+
+  labs(x = "Region_Code", fill = "Target")   
+```
+
+## Data cleaning
+```{r}
+#check the error
+#replace 1
+df$Dependent[df$Dependent == -1] <- 1
+summary(df)
+
+#check the missing value
+summary(is.na(df))
+
+#fill the missing value with mice
+df.missing <- df[is.na(df$Credit_Product), ]
+imputed_data <- mice(df, method = 'logreg', seed = 100)
+complete_data <- complete(imputed_data)
+
+#check the summary
+summary(complete_data)
+```
+
+## Encoding
+```{r}
+# labels
+complete_data$Gender = factor(complete_data$Gender,
+                              levels = c("Female", "Male"),
+                              labels = c(0, 1))
+
+complete_data$Credit_Product = factor(complete_data$Credit_Product,
+                                      levels = c("Yes", "No"),
+                                      labels = c(0, 1))
+
+complete_data$Account_Type = factor(complete_data$Account_Type,
+                                    levels = c("Gold", "Platinum", "Silver"),
+                                    labels = c(1, 2, 3))
+
+complete_data$Active = factor(complete_data$Active,
+                              levels = c("Yes", "No"),
+                              labels = c(0, 1))
+
+# one-hot
+complete_data <- one_hot(as.data.table(complete_data), cols = "Channel_Code")
+complete_data <- one_hot(as.data.table(complete_data), cols = "Occupation")
+
+# woe encoding
+woe_values <- woe(complete_data, "Region_Code", FALSE, "Target", C_Bin = 5, Bad = 0, Good = 1)
+#replace it with woe value
+woe_lookup <- data.frame(Region_Code = woe_values$BIN, WoE = woe_values$WOE)
+complete_data <- merge(complete_data, woe_lookup, by = "Region_Code", all.x = TRUE)
+complete_data <- complete_data%>%
+  rename(Region_Code1 = WoE)
+complete_data$Region_Code <- NULL
+```
+
+## Feature selection
+```{r}
+weights <- information.gain(Target~., complete_data)
+weights$attr <- rownames(weights)
+
+# Let's sort the weights in decreasing order of information gain values.
+weights <- arrange(weights, -attr_importance)
+
+# Plot the weights
+barplot(weights$attr_importance, names = weights$attr, las = 2, ylim = c(0, 0.1))
+
+```
+
+## scale data
+```{r}
+# Min-max normalize the mpg variable
+complete_data$Age <- scale(complete_data$Age, center = min(complete_data$Age), scale = max(complete_data$Age) - min(complete_data$Age))
+
+complete_data$Vintage<- scale(complete_data$Vintage, center = min(complete_data$Vintage), scale = max(complete_data$Vintage) - min(complete_data$Vintage))
+
+complete_data$Avg_Account_Balance <- scale(complete_data$Avg_Account_Balance, center = min(complete_data$Avg_Account_Balance), scale = max(complete_data$Avg_Account_Balance) - min(complete_data$Avg_Account_Balance))
+```
+
+## modeling
+### split data
+```{r}
+set.seed(123)
+
+#split training and test data, 70% for training
+index = createDataPartition(complete_data$Target, p = 0.7, list = FALSE)
+
+# Generate training and test data
+training = complete_data[index,]
+test = complete_data[-index,]
+```
+
+```{r}
+#find the proportion of the target
+prop.table(table(complete_data$Target))
+prop.table(table(training$Target))
+prop.table(table(test$Target))
+```
+
+### balancing data
+```{r}
+set.seed(123)
+#deal with the imbalanced data
+smote_data1 <- smote(Target~., training, perc.over = 2.5, perc.under = 1.5)
+smote_data2 <- smote(Target~., training, perc.over = 2, perc.under = 2)
+
+#check the proportion
+prop.table(table(smote_data1$Target))
+prop.table(table(smote_data2$Target))
+```
+
+```{r}
+#oversampling
+set.seed(123)
+oversampled_data <- ovun.sample(Target ~ . , data = training, method = "over", p= 0.5, seed=1)$data
+table(oversampled_data$Target)
+prop.table(table(oversampled_data$Target))
+```
+
+```{r}
+#undersampling
+set.seed(123)
+undersampled_data <- ovun.sample(Target ~., data = training, method = "under", p= 0.5, seed=1)$data
+table(undersampled_data$Target)
+prop.table(table(undersampled_data$Target))
+```
+
+```{r}
+#both 
+set.seed(123)
+balance_data <- ovun.sample(Target ~., data = training, method = "both", p= 0.5, seed=1)$data
+table(balance_data$Target)
+prop.table(table(balance_data$Target))
+```
+
+#### confusion matrix
+```{r}
+draw_confusion_matrix <- function(cm) {
+
+  total <- sum(cm$table)
+  res <- as.numeric(cm$table)
+
+  # Generate color gradients. Palettes come from RColorBrewer.
+  greenPalette <- c("#F7FCF5","#E5F5E0","#C7E9C0","#A1D99B","#74C476","#41AB5D","#238B45","#006D2C","#00441B")
+  redPalette <- c("#FFF5F0","#FEE0D2","#FCBBA1","#FC9272","#FB6A4A","#EF3B2C","#CB181D","#A50F15","#67000D")
+  getColor <- function (greenOrRed = "green", amount = 0) {
+    if (amount == 0)
+      return("#FFFFFF")
+    palette <- greenPalette
+    if (greenOrRed == "red")
+      palette <- redPalette
+    colorRampPalette(palette)(100)[10 + ceiling(90 * amount / total)]
+  }
+
+  # set the basic layout
+  layout(matrix(c(1,1,2)))
+  par(mar=c(2,2,2,2))
+  plot(c(100, 345), c(300, 450), type = "n", xlab="", ylab="", xaxt='n', yaxt='n')
+  title('CONFUSION MATRIX', cex.main=2)
+
+  # create the matrix 
+  classes = colnames(cm$table)
+  rect(150, 430, 240, 370, col=getColor("green", res[1]))
+  text(195, 435, classes[1], cex=1.2)
+  rect(250, 430, 340, 370, col=getColor("red", res[3]))
+  text(295, 435, classes[2], cex=1.2)
+  text(125, 370, 'Predicted', cex=1.3, srt=90, font=2)
+  text(245, 450, 'Actual', cex=1.3, font=2)
+  rect(150, 305, 240, 365, col=getColor("red", res[2]))
+  rect(250, 305, 340, 365, col=getColor("green", res[4]))
+  text(140, 400, classes[1], cex=1.2, srt=90)
+  text(140, 335, classes[2], cex=1.2, srt=90)
+
+  # add in the cm results
+  text(195, 400, res[1], cex=1.6, font=2, col='white')
+  text(195, 335, res[2], cex=1.6, font=2, col='white')
+  text(295, 400, res[3], cex=1.6, font=2, col='white')
+  text(295, 335, res[4], cex=1.6, font=2, col='white')
+
+  # add in the specifics 
+  plot(c(100, 0), c(100, 0), type = "n", xlab="", ylab="", main = "DETAILS", xaxt='n', yaxt='n')
+  text(10, 85, names(cm$byClass[1]), cex=1.2, font=2)
+  text(10, 70, round(as.numeric(cm$byClass[1]), 3), cex=1.2)
+  text(30, 85, names(cm$byClass[2]), cex=1.2, font=2)
+  text(30, 70, round(as.numeric(cm$byClass[2]), 3), cex=1.2)
+  text(50, 85, names(cm$byClass[5]), cex=1.2, font=2)
+  text(50, 70, round(as.numeric(cm$byClass[5]), 3), cex=1.2)
+  text(70, 85, names(cm$byClass[6]), cex=1.2, font=2)
+  text(70, 70, round(as.numeric(cm$byClass[6]), 3), cex=1.2)
+  text(90, 85, names(cm$byClass[7]), cex=1.2, font=2)
+  text(90, 70, round(as.numeric(cm$byClass[7]), 3), cex=1.2)
+
+  # add in the accuracy information 
+  text(30, 35, names(cm$overall[1]), cex=1.5, font=2)
+  text(30, 20, round(as.numeric(cm$overall[1]), 3), cex=1.4)
+  text(70, 35, names(cm$overall[2]), cex=1.5, font=2)
+  text(70, 20, round(as.numeric(cm$overall[2]), 3), cex=1.4)
+}  
+```
+
+
+### Logistic Regression Model
+```{r}
+set.seed(123)
+
+LogReg1 <- glm(Target~. , balance_data, family = "binomial")
+LogReg2 <- glm(Target~. , oversampled_data, family = "binomial")
+LogReg3 <- glm(Target~. , undersampled_data, family = "binomial")
+LogReg4 <- glm(Target~. , smote_data1, family = "binomial")
+LogReg5 <- glm(Target~. , smote_data2, family = "binomial")
+
+# Predict the class probabilities of the test data
+LogReg_pred1 <- predict(LogReg1, test, type="response")
+LogReg_pred2 <- predict(LogReg2, test, type="response")
+LogReg_pred3 <- predict(LogReg3, test, type="response")
+LogReg_pred4 <- predict(LogReg4, test, type="response")
+LogReg_pred5 <- predict(LogReg5, test, type="response")
+
+
+# Predict the class 
+LogReg_class1 <- ifelse(LogReg_pred1 > 0.5, 1, 0)
+LogReg_class2 <- ifelse(LogReg_pred2 > 0.5, 1, 0)
+LogReg_class3 <- ifelse(LogReg_pred3 > 0.5, 1, 0)
+LogReg_class4 <- ifelse(LogReg_pred4 > 0.5, 1, 0)
+LogReg_class5 <- ifelse(LogReg_pred5 > 0.5, 1, 0)
+
+
+# Save the predictions as factor variables
+LogReg_class1 <- as.factor(LogReg_class1)
+LogReg_class2 <- as.factor(LogReg_class2)
+LogReg_class3 <- as.factor(LogReg_class3)
+LogReg_class4 <- as.factor(LogReg_class4)
+LogReg_class5 <- as.factor(LogReg_class5)
+
+# Creating Confusion Matrix
+LogReg_cm1 <- confusionMatrix(LogReg_class1, test$Target, positive = "1", mode = "prec_recall")
+LogReg_cm2 <- confusionMatrix(LogReg_class2, test$Target, positive = "1", mode = "prec_recall")
+LogReg_cm3 <- confusionMatrix(LogReg_class3, test$Target, positive = "1", mode = "prec_recall")
+LogReg_cm4 <- confusionMatrix(LogReg_class4, test$Target, positive = "1", mode = "prec_recall")
+LogReg_cm5 <- confusionMatrix(LogReg_class5, test$Target, positive = "1", mode = "prec_recall")
+
+# Visuliazition Confusion Matrix
+draw_confusion_matrix(LogReg_cm1)
+draw_confusion_matrix(LogReg_cm2)
+draw_confusion_matrix(LogReg_cm3)
+draw_confusion_matrix(LogReg_cm4)
+draw_confusion_matrix(LogReg_cm5)
+```
+
+
+### Random Forest
+```{r}
+# Set random seed
+set.seed(123)
+
+# Build Random Forest model and assign it to RF_model
+RF_model1 <- randomForest(Target~., balance_data)
+RF_model2 <- randomForest(Target~., oversampled_data)
+RF_model3 <- randomForest(Target~., undersampled_data)
+RF_model4 <- randomForest(Target~., smote_data1)
+RF_model5 <- randomForest(Target~., smote_data2)
+
+# Predict the class of the test data
+RF_pred1 <- predict(RF_model1, test)
+RF_pred2 <- predict(RF_model2, test)
+RF_pred3 <- predict(RF_model3, test)
+RF_pred4 <- predict(RF_model4, test)
+RF_pred5 <- predict(RF_model5, test)
+
+# Confusion matrix
+RF_cm1 <- confusionMatrix(RF_pred1, test$Target, positive='1', mode = "prec_recall")
+RF_cm2 <-confusionMatrix(RF_pred2, test$Target, positive='1', mode = "prec_recall")
+RF_cm3 <- confusionMatrix(RF_pred3, test$Target, positive='1', mode = "prec_recall")
+RF_cm4 <- confusionMatrix(RF_pred4, test$Target, positive='1', mode = "prec_recall")
+RF_cm5 <-confusionMatrix(RF_pred5, test$Target, positive='1', mode = "prec_recall")
+
+# Visuliazition Confusion Matrix
+draw_confusion_matrix(RF_cm1)
+draw_confusion_matrix(RF_cm2)
+draw_confusion_matrix(RF_cm3)
+draw_confusion_matrix(RF_cm4)
+draw_confusion_matrix(RF_cm5)
+```
+
+
+### parameter tuning RF model
+```{r}
+# MODEL TUNING (RF)
+set.seed(123)
+
+# Perform joint hyperparameter tuning using tune function
+tuned_rf1 <- randomForestSRC::tune(Target~., balance_data,
+   mtryStart = sqrt(ncol(balance_data)),   
+   nodesizeTry = seq(1, 10, by = 2), 
+   ntree = 100,
+   stepFactor = 1.25, improve = 0.001)
+
+tuned_rf2 <- randomForestSRC::tune(Target~., oversampled_data,
+   mtryStart = sqrt(ncol(oversampled_data)),   
+   nodesizeTry = seq(1, 10, by = 2), 
+   ntree = 100,
+   stepFactor = 1.25, improve = 0.001)
+
+tuned_rf3 <- randomForestSRC::tune(Target~., undersampled_data,
+   mtryStart = sqrt(ncol(undersampled_data)),   
+   nodesizeTry = seq(1, 10, by = 2), 
+   ntree = 100,
+   stepFactor = 1.25, improve = 0.001)
+
+tuned_rf4 <- randomForestSRC::tune(Target~., smote_data1,
+   mtryStart = sqrt(ncol(smote_data1)),   
+   nodesizeTry = seq(1, 10, by = 2), 
+   ntree = 100,
+   stepFactor = 1.25, improve = 0.001)
+
+tuned_rf5 <- randomForestSRC::tune(Target~., smote_data2,
+   mtryStart = sqrt(ncol(smote_data2)),   
+   nodesizeTry = seq(1, 10, by = 2), 
+   ntree = 100,
+   stepFactor = 1.25, improve = 0.001)
+
+# View the results to see the best hyperparameters
+tuned_rf1$optimal
+tuned_rf2$optimal
+tuned_rf3$optimal
+tuned_rf4$optimal
+tuned_rf5$optimal
+
+set.seed(123)
+bestRF1 <-  randomForest(Target~., balance_data, mtry = 7, nodesize = 1, ntree = 100)
+bestRF2 <-  randomForest(Target~., oversampled_data, mtry = 8, nodesize = 1, ntree = 100)
+bestRF3 <-  randomForest(Target~., undersampled_data, mtry = 15, nodesize = 7, ntree = 100)
+bestRF4 <-  randomForest(Target~., smote_data1, mtry = 20, nodesize = 3, ntree = 100)
+bestRF5 <-  randomForest(Target~., smote_data2, mtry = 20, nodesize = 1, ntree = 100)
+
+
+RF_tunedpred1 <- predict(bestRF1, test)
+RF_tunedpred2 <- predict(bestRF2, test)
+RF_tunedpred3 <- predict(bestRF3, test)
+RF_tunedpred4 <- predict(bestRF4, test)
+RF_tunedpred5 <- predict(bestRF5, test)
+
+
+RF_tunedcm1 <- confusionMatrix(RF_tunedpred1, test$Target, positive='1', mode = "prec_recall")
+RF_tunedcm2 <- confusionMatrix(RF_tunedpred2, test$Target, positive='1', mode = "prec_recall")
+RF_tunedcm3 <- confusionMatrix(RF_tunedpred3, test$Target, positive='1', mode = "prec_recall")
+RF_tunedcm4 <- confusionMatrix(RF_tunedpred4, test$Target, positive='1', mode = "prec_recall")
+RF_tunedcm5 <- confusionMatrix(RF_tunedpred5, test$Target, positive='1', mode = "prec_recall")
+
+# Visuliazition Confusion Matrix
+draw_confusion_matrix(RF_tunedcm1)
+draw_confusion_matrix(RF_tunedcm2)
+draw_confusion_matrix(RF_tunedcm3)
+draw_confusion_matrix(RF_tunedcm4)
+draw_confusion_matrix(RF_tunedcm5)
+```
+
+### SVM model
+```{r}
+set.seed(123)
+# MODEL 3: SVM
+SVM_model1 <- svm(Target~., balance_data, kernel= "radial", scale = TRUE, probability = TRUE)
+SVM_model2  <- svm(Target ~. ,oversampled_data, kernel = "radial", scale = TRUE, probability = TRUE)
+SVM_model3  <- svm(Target ~. ,undersampled_data, kernel = "radial", scale = TRUE, probability = TRUE)
+SVM_model4  <- svm(Target ~. ,smote_data1, kernel = "radial", scale = TRUE, probability = TRUE)
+SVM_model5  <- svm(Target ~. ,smote_data2, kernel = "radial", scale = TRUE, probability = TRUE)
+
+print(SVM_model1)
+print(SVM_model2)
+print(SVM_model3)
+print(SVM_model4)
+print(SVM_model5)
+
+# Predict the Test set results 
+SVM_pred1 <- predict(SVM_model1, test, probability = TRUE)
+SVM_pred2 <- predict(SVM_model2, test, probability = TRUE)
+SVM_pred3 <- predict(SVM_model3, test, probability = TRUE)
+SVM_pred4 <- predict(SVM_model4, test, probability = TRUE)
+SVM_pred5 <- predict(SVM_model5, test, probability = TRUE)
+
+# Copy test data to results
+results <- test
+
+# The following code generates a column named PredictionSVM in dataframe results and adds predictions obtained by SVM to that column
+results$PredictionSVM1 <-  SVM_pred1
+results$PredictionSVM2 <-  SVM_pred2
+results$PredictionSVM3 <-  SVM_pred3
+results$PredictionSVM4 <-  SVM_pred4
+results$PredictionSVM5 <-  SVM_pred5
+
+# Find the correct predictions
+correct_svm1 <- which(test$Target == SVM_pred1 )
+correct_svm2 <- which(test$Target == SVM_pred2 )
+correct_svm3 <- which(test$Target == SVM_pred3 )
+correct_svm4 <- which(test$Target == SVM_pred4 )
+correct_svm5 <- which(test$Target == SVM_pred5 )
+
+# Find the percentage of correct predictions using length() function
+accuracy_svm1 <- length(correct_svm1)/nrow(test)
+accuracy_svm2 <- length(correct_svm2)/nrow(test)
+accuracy_svm3 <- length(correct_svm3)/nrow(test)
+accuracy_svm4 <- length(correct_svm4)/nrow(test)
+accuracy_svm5 <- length(correct_svm5)/nrow(test)
+
+# Use confusionMatrix to print the performance of SVM model
+SVM_cm1 <- confusionMatrix(SVM_pred1, test$Target, positive = "1", mode = "prec_recall")
+SVM_cm2 <- confusionMatrix(SVM_pred2, test$Target, positive = "1", mode = "prec_recall")
+SVM_cm3 <- confusionMatrix(SVM_pred3, test$Target, positive = "1", mode = "prec_recall")
+SVM_cm4 <- confusionMatrix(SVM_pred4, test$Target, positive = "1", mode = "prec_recall")
+SVM_cm5 <- confusionMatrix(SVM_pred5, test$Target, positive = "1", mode = "prec_recall")
+
+# Visuliazition Confusion Matrix
+draw_confusion_matrix(SVM_cm1)
+draw_confusion_matrix(SVM_cm2)
+draw_confusion_matrix(SVM_cm3)
+draw_confusion_matrix(SVM_cm4)
+draw_confusion_matrix(SVM_cm5)
+```
+
+### Decision Tree
+```{r}
+set.seed(123)
+# Build Decision Tree model
+DT_modelboth <- rpart(Target ~ ., data = balance_data, method = "class")
+DT_modelover <- rpart(Target ~ ., data = oversampled_data, method = "class")
+DT_modelunder <- rpart(Target ~ ., data = undersampled_data, method = "class")
+DT_model4 <- rpart(Target ~ ., data = smote_data1, method = "class")
+DT_model5 <- rpart(Target ~ ., data = smote_data2, method = "class")
+
+# Plot the Decision Tree
+rpart.plot(DT_modelboth)
+rpart.plot(DT_modelover)
+rpart.plot(DT_modelunder)
+rpart.plot(DT_model4)
+rpart.plot(DT_model5)
+
+# Make predictions on the test data
+DT_predboth <- predict(DT_modelboth, newdata = test, type = "class")
+DT_predover <- predict(DT_modelover, newdata = test, type = "class")
+DT_predunder <- predict(DT_modelunder, newdata = test, type = "class")
+DT_pred4 <- predict(DT_model4, newdata = test, type = "class")
+DT_pred5 <- predict(DT_model5, newdata = test, type = "class")
+
+# Confusion matrix
+DT_cm1 <- confusionMatrix(DT_predboth, test$Target, positive = '1', mode = "prec_recall")
+DT_cm2 <- confusionMatrix(DT_predover, test$Target, positive = '1', mode = "prec_recall")
+DT_cm3 <- confusionMatrix(DT_predunder, test$Target, positive = '1', mode = "prec_recall")
+DT_cm4 <- confusionMatrix(DT_pred4, test$Target, positive = '1', mode = "prec_recall")
+DT_cm5 <- confusionMatrix(DT_pred5, test$Target, positive = '1', mode = "prec_recall")
+
+# Visuliazition Confusion Matrix
+draw_confusion_matrix(DT_cm1)
+draw_confusion_matrix(DT_cm2)
+draw_confusion_matrix(DT_cm3)
+draw_confusion_matrix(DT_cm4)
+draw_confusion_matrix(DT_cm5)
+```
+
+### KNN
+```{r}
+# Set random seed
+set.seed(123)
+
+# Create a sample stratified by Handedness, set fraction to 0.7
+balance_data_strat <- stratified(balance_data, "Target", 0.7)
+oversampled_data_strat <- stratified(oversampled_data, "Target", 0.7)
+undersampled_data_strat <- stratified(undersampled_data, "Target", 0.7)
+smote_data1_strat <- stratified(smote_data1, "Target", 0.7)
+smote_data2_strat <- stratified(smote_data2, "Target", 0.7)
+prop.table(smote_data2_strat)
+knn_pred1 <- knn(train = balance_data_strat, test = test, cl = balance_data_strat$Target, k=sqrt_integer <- ceiling(sqrt(nrow(balance_data_strat))))
+knn_pred2 <- knn(train = oversampled_data_strat, test = test, cl = oversampled_data_strat$Target, k=sqrt_integer <- ceiling(sqrt(nrow(oversampled_data_strat))))
+knn_pred3 <- knn(train = undersampled_data_strat, test = test, cl = undersampled_data_strat$Target, k=sqrt_integer <- ceiling(sqrt(nrow(undersampled_data_strat))))
+knn_pred4 <- knn(train = smote_data1_strat, test = test, cl = smote_data1_strat$Target, k=sqrt_integer <- ceiling(sqrt(nrow(smote_data1_strat))))
+knn_pred5 <- knn(train = smote_data2_strat, test = test, cl = smote_data2_strat$Target, k=sqrt_integer <- ceiling(sqrt(nrow(smote_data2_strat))))
+
+knn_cm1 <- confusionMatrix(knn_pred1, test$Target, positive = "1", mode="prec_recall")
+knn_cm2 <- confusionMatrix(knn_pred2, test$Target, positive = "1", mode="prec_recall")
+knn_cm3 <- confusionMatrix(knn_pred3, test$Target, positive = "1", mode="prec_recall")
+knn_cm4 <- confusionMatrix(knn_pred4, test$Target, positive = "1", mode="prec_recall")
+knn_cm5 <- confusionMatrix(knn_pred5, test$Target, positive = "1", mode="prec_recall")
+
+draw_confusion_matrix(knn_cm1)
+draw_confusion_matrix(knn_cm2)
+draw_confusion_matrix(knn_cm3)
+draw_confusion_matrix(knn_cm4)
+draw_confusion_matrix(knn_cm5)
+
+```
+
+### XGBOOST
+```{r}
+train.x1 <- subset(balance_data, select = -20)
+train.x1 = data.matrix(train.x1)
+train.y1 = data.frame(balance_data$Target)
+train.y1 <- as.numeric(as.character(balance_data$Target))
+train.y1 <- as.numeric(train.y1)
+
+test.x1 <- subset(test, select = -20)
+test.x1 = data.matrix(test.x1)
+test.y1 <- test$Target
+test.y1 <- as.numeric(test.y1)
+
+xgb_train1 = xgb.DMatrix(data = train.x1, label = train.y1)
+xgb_test1 = xgb.DMatrix(data = test.x1, label = test.y1)
+watchlist1 = list(train = xgb_train1, test = xgb_test1)
+set.seed(123)
+xgb1 = xgboost(data = xgb_train1, max.depth = 8, nrounds = 1000, eta = 0.1, nthread = 3, objective = "binary:logistic")
+
+pred1 <- predict(xgb1, xgb_test1)
+predicted_labels1 <- ifelse(pred1 > 0.5, 1, 0)
+predicted_labels1 <- factor(predicted_labels1, levels = levels(test$Target))
+
+#confusion matrix
+xgb_cm1 <- confusionMatrix(predicted_labels1, test$Target, positive='1', mode = "prec_recall")
+draw_confusion_matrix(xgb_cm1)
+```
+
+```{r}
+train.x2 <- subset(oversampled_data, select = -20)
+train.x2 = data.matrix(train.x2)
+train.y2 = data.frame(oversampled_data$Target)
+train.y2 <- as.numeric(as.character(oversampled_data$Target))
+train.y2 <- as.numeric(train.y2)
+
+test.x2 <- subset(test, select = -20)
+test.x2 = data.matrix(test.x2)
+test.y2 <- test$Target
+test.y2 <- as.numeric(test.y2)
+
+xgb_train2 = xgb.DMatrix(data = train.x2, label = train.y2)
+xgb_test2 = xgb.DMatrix(data = test.x2, label = test.y2)
+watchlist2 = list(train = xgb_train2, test = xgb_test2)
+set.seed(123)
+xgb2 = xgboost(data = xgb_train2, max.depth = 8, nrounds = 1000, eta = 0.1, nthread = 3, objective = "binary:logistic")
+
+pred2 <- predict(xgb2, xgb_test2)
+predicted_labels2 <- ifelse(pred2 > 0.5, 1, 0)
+predicted_labels2 <- factor(predicted_labels2, levels = levels(test$Target))
+
+
+#confusion matrix
+xgb_cm2 <- confusionMatrix(predicted_labels1, test$Target, positive='1', mode = "prec_recall")
+draw_confusion_matrix(xgb_cm2)
+```
+
+```{r}
+train.x3 <- subset(undersampled_data, select = -20)
+train.x3 = data.matrix(train.x3)
+train.y3 = data.frame(undersampled_data$Target)
+train.y3 <- as.numeric(as.character(undersampled_data$Target))
+train.y3 <- as.numeric(train.y3)
+
+test.x3 <- subset(test, select = -20)
+test.x3 = data.matrix(test.x3)
+test.y3 <- test$Target
+test.y3 <- as.numeric(test.y3)
+
+xgb_train3 = xgb.DMatrix(data = train.x3, label = train.y3)
+xgb_test3 = xgb.DMatrix(data = test.x3, label = test.y3)
+watchlist3 = list(train = xgb_train3, test = xgb_test3)
+set.seed(123)
+xgb3 = xgboost(data = xgb_train3, max.depth = 8, nrounds = 1000, eta = 0.1, nthread = 3, objective = "binary:logistic")
+
+pred3 <- predict(xgb3, xgb_test3)
+predicted_labels3 <- ifelse(pred3 > 0.5, 1, 0)
+predicted_labels3 <- factor(predicted_labels3, levels = levels(test$Target))
+
+#confusion matrix
+xgb_cm3 <- confusionMatrix(predicted_labels3, test$Target, positive='1', mode = "prec_recall")
+draw_confusion_matrix(xgb_cm3)
+```
+
+```{r}
+train.x4 <- subset(smote_data1, select = -20)
+train.x4 = data.matrix(train.x4)
+train.y4 = data.frame(smote_data1$Target)
+train.y4 <- as.numeric(as.character(smote_data1$Target))
+train.y4 <- as.numeric(train.y4)
+
+test.x4 <- subset(test, select = -20)
+test.x4 = data.matrix(test.x4)
+test.y4 <- test$Target
+test.y4 <- as.numeric(test.y4)
+
+xgb_train4 = xgb.DMatrix(data = train.x4, label = train.y4)
+xgb_test4 = xgb.DMatrix(data = test.x4, label = test.y4)
+watchlist4 = list(train = xgb_train4, test = xgb_test4)
+set.seed(123)
+xgb4 = xgboost(data = xgb_train4, max.depth = 8, nrounds = 1000, eta = 0.1, nthread = 3, objective = "binary:logistic")
+
+pred4 <- predict(xgb4, xgb_test4)
+predicted_labels4 <- ifelse(pred4 > 0.5, 1, 0)
+predicted_labels4 <- factor(predicted_labels4, levels = levels(test$Target))
+
+#confusion matrix
+xgb_cm4 <- confusionMatrix(predicted_labels4, test$Target, positive='1', mode = "prec_recall")
+draw_confusion_matrix(xgb_cm4)
+```
+
+```{r}
+train.x5 <- subset(smote_data2, select = -20)
+train.x5 = data.matrix(train.x5)
+train.y5 = data.frame(smote_data2$Target)
+train.y5 <- as.numeric(as.character(smote_data2$Target))
+train.y5 <- as.numeric(train.y5)
+
+test.x5 <- subset(test, select = -20)
+test.x5 = data.matrix(test.x5)
+test.y5 <- test$Target
+test.y5 <- as.numeric(test.y5)
+
+xgb_train5 = xgb.DMatrix(data = train.x5, label = train.y5)
+xgb_test5 = xgb.DMatrix(data = test.x5, label = test.y5)
+watchlist5 = list(train = xgb_train5, test = xgb_test5)
+set.seed(123)
+xgb5 = xgboost(data = xgb_train5, max.depth = 8, nrounds = 1000, eta = 0.1, nthread = 3, objective = "binary:logistic")
+
+pred5 <- predict(xgb5, xgb_test5)
+predicted_labels5 <- ifelse(pred5 > 0.5, 1, 0)
+predicted_labels5 <- factor(predicted_labels5, levels = levels(test$Target))
+
+#confusion matrix
+xgb_cm5 <- confusionMatrix(predicted_labels5, test$Target, positive='1', mode = "prec_recall")
+draw_confusion_matrix(xgb_cm5)
+```
+
+## evaluation
+### ROC
+#### Logreg ROC
+```{r}
+# Obtain the ROC curve data for logistic regression
+ROC_LogReg1 <- roc(test$Target, LogReg_pred1)
+ROC_LogReg2 <- roc(test$Target, LogReg_pred2)
+ROC_LogReg3 <- roc(test$Target, LogReg_pred3)
+ROC_LogReg4 <- roc(test$Target, LogReg_pred4)
+ROC_LogReg5 <- roc(test$Target, LogReg_pred5)
+
+# Ploting the ROC curve
+pROC::ggroc(list(LogReg1 = ROC_LogReg1, LogReg2 = ROC_LogReg2, LogReg3 = ROC_LogReg3, LogReg4 = ROC_LogReg4, LogReg5 = ROC_LogReg5), legacy.axes=TRUE)+ xlab("FPR") + ylab("TPR") +
+   geom_abline(intercept = 0, slope = 1, color = "darkgrey", linetype = "dashed")
+
+# get the value of auc
+auc(ROC_LogReg1)
+auc(ROC_LogReg2)
+auc(ROC_LogReg3)
+auc(ROC_LogReg4)
+auc(ROC_LogReg5)
+```
+
+
+#### RF ROC
+```{r}
+# Obtain class probabilities by using predict() and adding type = "prob" for Random Forest
+RF_prob1 <- predict(RF_model1, test, type = "prob")
+RF_prob2 <- predict(RF_model2, test, type = "prob")
+RF_prob3 <- predict(RF_model3, test, type = "prob")
+RF_prob4 <- predict(RF_model4, test, type = "prob")
+RF_prob5 <- predict(RF_model5, test, type = "prob")
+
+# Obtain the ROC curve data for logistic regression
+ROC_RF1 <- roc(test$Target, RF_prob1[,2])
+ROC_RF2 <- roc(test$Target, RF_prob2[,2])
+ROC_RF3 <- roc(test$Target, RF_prob3[,2])
+ROC_RF4 <- roc(test$Target, RF_prob4[,2])
+ROC_RF5 <- roc(test$Target, RF_prob5[,2])
+
+# Plot the ROC curve for Random Forest
+ggroc(list(RF1 = ROC_RF1, RF2 = ROC_RF2, RF3 = ROC_RF3, RF4 = ROC_RF4, RF5 = ROC_RF5), legacy.axes=TRUE)+ xlab("FPR") + ylab("TPR") +
+   geom_abline(intercept = 0, slope = 1, color = "darkgrey", linetype = "dashed")
+
+# get the value of auc
+auc(ROC_RF1)
+auc(ROC_RF2)
+auc(ROC_RF3)
+auc(ROC_RF4)
+auc(ROC_RF5)
+```
+
+
+#### tuning RF ROC
+```{r}
+# Obtain class probabilities by using predict() and adding type = "prob" for Random Forest
+RF_tuning_prob1 <- predict(bestRF1, test, type = "prob")
+RF_tuning_prob2 <- predict(bestRF2, test, type = "prob")
+RF_tuning_prob3 <- predict(bestRF3, test, type = "prob")
+RF_tuning_prob4 <- predict(bestRF4, test, type = "prob")
+RF_tuning_prob5 <- predict(bestRF5, test, type = "prob")
+
+# Obtain the ROC curve data for logistic regression
+ROC_tuning_RF1 <- roc(test$Target, RF_tuning_prob1[,2])
+ROC_tuning_RF2 <- roc(test$Target, RF_tuning_prob2[,2])
+ROC_tuning_RF3 <- roc(test$Target, RF_tuning_prob3[,2])
+ROC_tuning_RF4 <- roc(test$Target, RF_tuning_prob4[,2])
+ROC_tuning_RF5 <- roc(test$Target, RF_tuning_prob5[,2])
+
+# Plot the ROC curve for Random Forest
+ggroc(list(RF_tuning1 = ROC_tuning_RF1, RF_tuning2 = ROC_tuning_RF2, RF_tuning3 = ROC_tuning_RF3, RF_tuning4 = ROC_tuning_RF4, RF_tuning5 = ROC_tuning_RF5), legacy.axes=TRUE)+ xlab("FPR") + ylab("TPR") +
+   geom_abline(intercept = 0, slope = 1, color = "darkgrey", linetype = "dashed")
+
+# get the value of auc
+auc(ROC_tuning_RF1)
+auc(ROC_tuning_RF2)
+auc(ROC_tuning_RF3)
+auc(ROC_tuning_RF4)
+auc(ROC_tuning_RF5)
+```
+
+#### SVM ROC
+```{r}
+# Use SVMpred to extract probabilities
+SVM_prob1 <- attr(SVM_pred1, "probabilities")
+SVM_prob2 <- attr(SVM_pred2, "probabilities")
+SVM_prob3 <- attr(SVM_pred3, "probabilities")
+SVM_prob4 <- attr(SVM_pred4, "probabilities")
+SVM_prob5 <- attr(SVM_pred5, "probabilities")
+
+# Obtain the ROC curve data for SVM 
+ROC_SVM1 <- roc(test$Target, SVM_prob1[,2])
+ROC_SVM2 <- roc(test$Target, SVM_prob2[,2])
+ROC_SVM3 <- roc(test$Target, SVM_prob3[,2])
+ROC_SVM4 <- roc(test$Target, SVM_prob4[,2])
+ROC_SVM5 <- roc(test$Target, SVM_prob5[,2])
+
+# Plot the ROC curve for Random Forest
+ggroc(list(SVM1 = ROC_SVM1, SVM2 = ROC_SVM2, SVM3 = ROC_SVM3, SVM4 = ROC_SVM4, SVM5 = ROC_SVM5), legacy.axes=TRUE)+ xlab("FPR") + ylab("TPR") +
+   geom_abline(intercept = 0, slope = 1, color = "darkgrey", linetype = "dashed")
+
+# get the value of auc
+auc(ROC_SVM1)
+auc(ROC_SVM2)
+auc(ROC_SVM3)
+auc(ROC_SVM4)
+auc(ROC_SVM5)
+```
+
+#### Decision Tree ROC
+```{r}
+DT_modelboth_prob <- predict(DT_modelboth, test, type = "prob")
+DT_modelover_prob <- predict(DT_modelover, test, type = "prob")
+DT_modelunder_prob <- predict(DT_modelunder, test, type = "prob")
+DT_model4_prob <- predict(DT_model4, test, type = "prob")
+DT_model5_prob <- predict(DT_model5, test, type = "prob")
+
+ROC_DT_modelboth_prob <- roc(test$Target, DT_modelboth_prob[,2])
+ROC_DT_modelover_prob <- roc(test$Target, DT_modelover_prob[,2])
+ROC_DT_modelunder_prob <- roc(test$Target, DT_modelunder_prob[,2])
+ROC_DT_model4_prob <- roc(test$Target, DT_model4_prob[,2])
+ROC_DT_model5_prob <- roc(test$Target, DT_model5_prob[,2])
+
+#get the value of auc
+auc(ROC_DT_modelboth_prob)
+auc(ROC_DT_modelover_prob)
+auc(ROC_DT_modelunder_prob)
+auc(ROC_DT_model4_prob)
+auc(ROC_DT_model5_prob)
+
+# Plot the ROC curve for Decision Tree
+pROC::ggroc(list(DT_model4_prob = ROC_DT_model4_prob,DT_model5_prob = ROC_DT_model5_prob,DT_modelover_prob = ROC_DT_modelover_prob,DT_modeunder_prob = ROC_DT_modelunder_prob,DT_modelboth_prob = ROC_DT_modelboth_prob), legacy.axes=TRUE)+ xlab("FPR") + ylab("TPR") +
+   geom_abline(intercept = 0, slope = 1, color = "darkgrey", linetype = "dashed")
+```
+
+#### KNN ROC
+```{r}
+knn_pred_prob1 <- as.numeric(knn_pred1 == levels(knn_pred1)[2])
+knn_pred_prob2 <- as.numeric(knn_pred2 == levels(knn_pred2)[2])
+knn_pred_prob3 <- as.numeric(knn_pred3 == levels(knn_pred3)[2])
+knn_pred_prob4 <- as.numeric(knn_pred4 == levels(knn_pred4)[2])
+knn_pred_prob5 <- as.numeric(knn_pred5 == levels(knn_pred5)[2])
+
+ROC_knn1 <- roc(test$Target, knn_pred_prob1)
+ROC_knn2 <- roc(test$Target, knn_pred_prob2)
+ROC_knn3 <- roc(test$Target, knn_pred_prob3)
+ROC_knn4 <- roc(test$Target, knn_pred_prob4)
+ROC_knn5 <- roc(test$Target, knn_pred_prob5)
+
+ggroc(list(KNN1 = ROC_knn1, KNN3 = ROC_knn3, KNN4 = ROC_knn4, KNN5 = ROC_knn5), legacy.axes=TRUE)+ xlab("FPR") + ylab("TPR") +
+   geom_abline(intercept = 0, slope = 1, color = "darkgrey", linetype = "dashed")
+
+auc(ROC_knn1)
+auc(ROC_knn2)
+auc(ROC_knn3)
+auc(ROC_knn4)
+auc(ROC_knn5)
+```
+
+#### XGBOOST ROC
+```{r}
+xgb_roc1 <- roc(factor(test$Target, levels = c("0", "1")), pred1)
+xgb_roc2 <- roc(factor(test$Target, levels = c("0", "1")), pred2)
+xgb_roc3 <- roc(factor(test$Target, levels = c("0", "1")), pred3)
+xgb_roc4 <- roc(factor(test$Target, levels = c("0", "1")), pred4)
+xgb_roc5 <- roc(factor(test$Target, levels = c("0", "1")), pred5)
+
+
+# Plot the ROC curve for Decision Tree
+pROC::ggroc(list(xgb1 = xgb_roc1,xgb2 = xgb_roc2,xgb3 = xgb_roc3,xgb4 = xgb_roc4,xgb5 = xgb_roc5), legacy.axes=TRUE)+ xlab("FPR") + ylab("TPR") +
+   geom_abline(intercept = 0, slope = 1, color = "darkgrey", linetype = "dashed")
+
+# get the auc of xgbooost
+auc(xgb_roc1)
+auc(xgb_roc2)
+auc(xgb_roc3)
+auc(xgb_roc4)
+auc(xgb_roc5)
+```
+
+
+### ROC for all models
+```{r}
+pROC::ggroc(list(LogReg = ROC_LogReg, RF = ROC_RF2, RF_tuning = ROC_tuning_RF2, SVM = ROC_SVM2, RF = ROC_RF, DT = ROC_DT_modelover_prob, KNN = ROC_knn2, XGBOOST = xgb_roc2), legacy.axes=TRUE)+ xlab("FPR") + ylab("TPR") +
+   geom_abline(intercept = 0, slope = 1, color = "darkgrey", linetype = "dashed")
+```
+
+### Gain chart
+#### LogReg gain chart
+```{r}
+# Provide probabilities for the outcome of interest and obtain the gain chart data
+GainTable_Log1 <- cumGainsTable(LogReg_pred1, test$Target, resolution = 1/100)
+GainTable_Log2 <- cumGainsTable(LogReg_pred2, test$Target, resolution = 1/100)
+GainTable_Log3 <- cumGainsTable(LogReg_pred3, test$Target, resolution = 1/100)
+GainTable_Log4 <- cumGainsTable(LogReg_pred4, test$Target, resolution = 1/100)
+GainTable_Log5 <- cumGainsTable(LogReg_pred5, test$Target, resolution = 1/100)
+
+# draw the plot
+plot(LogReg_pred1[,4], col="red", type="l", xlab="Percentage of test instances", ylab="Percentage of identified invalid claims") 
+lines(LogReg_pred2[,4], col="green", type="l")
+lines(LogReg_pred3[,4], col="yellow", type="l")
+lines(LogReg_pred4[,4], col="pink", type="l")
+lines(LogReg_pred5[,4], col="purple", type="l")
+grid(NULL, lwd = 1)
+
+legend("bottomright",
+c("Log1", "Log2", "Log3", "Log4", "Log5"),
+fill=c("red", "green", "yellow", "pink", "purple"))
+```
+
+#### RF gain chart
+```{r}
+# Provide probabilities for the outcome of interest and obtain the gain chart data
+GainTable_RF1 <- cumGainsTable(RF_prob1[,2], test$Target, resolution = 1/100)
+GainTable_RF2 <- cumGainsTable(RF_prob2[,2], test$Target, resolution = 1/100)
+GainTable_RF3 <- cumGainsTable(RF_prob3[,2], test$Target, resolution = 1/100)
+GainTable_RF4 <- cumGainsTable(RF_prob4[,2], test$Target, resolution = 1/100)
+GainTable_RF5 <- cumGainsTable(RF_prob5[,2], test$Target, resolution = 1/100)
+
+# draw the plot
+plot(GainTable_RF1[,4], col="red", type="l", xlab="Percentage of test instances", ylab="Percentage of identified invalid claims") 
+lines(GainTable_RF2[,4], col="green", type="l")
+lines(GainTable_RF3[,4], col="yellow", type="l")
+lines(GainTable_RF4[,4], col="pink", type="l")
+lines(GainTable_RF5[,4], col="purple", type="l")
+grid(NULL, lwd = 1)
+
+legend("bottomright",
+c("RF1", "RF2", "RF3", "RF4", "RF5"),
+fill=c("red", "green", "yellow", "pink", "purple"))
+```
+
+#### tuning RF gain chart
+```{r}
+# Provide probabilities for the outcome of interest and obtain the gain chart data
+GainTable_RF_tuning1 <- cumGainsTable(RF_tuning_prob1[,2], test$Target, resolution = 1/100)
+GainTable_RF_tuning2 <- cumGainsTable(RF_tuning_prob2[,2], test$Target, resolution = 1/100)
+GainTable_RF_tuning3 <- cumGainsTable(RF_tuning_prob3[,2], test$Target, resolution = 1/100)
+GainTable_RF_tuning4 <- cumGainsTable(RF_tuning_prob4[,2], test$Target, resolution = 1/100)
+GainTable_RF_tuning5 <- cumGainsTable(RF_tuning_prob5[,2], test$Target, resolution = 1/100)
+
+# draw the plot
+plot(GainTable_RF1[,4], col="red", type="l", xlab="Percentage of test instances", ylab="Percentage of identified invalid claims") 
+lines(GainTable_RF2[,4], col="green", type="l")
+lines(GainTable_RF3[,4], col="yellow", type="l")
+lines(GainTable_RF4[,4], col="pink", type="l")
+lines(GainTable_RF5[,4], col="purple", type="l")
+grid(NULL, lwd = 1)
+
+legend("bottomright",
+c("RF_tuning1", "RF_tuning2", "RF_tuning3", "RF_tuning4", "RF_tuning5"),
+fill=c("red","green", "yellow", "pink", "purple"))
+```
+
+#### Decision Tree gain chart
+```{r}
+# Provide probabilities for the outcome of interest and obtain the gain chart data
+GainTable_DT1 <- cumGainsTable(DT_modelboth_prob[,2], test$Target, resolution = 1/100)
+GainTable_DT2 <- cumGainsTable(DT_modelover_prob[,2], test$Target, resolution = 1/100)
+GainTable_DT3 <- cumGainsTable(DT_modelunder_prob[,2], test$Target, resolution = 1/100)
+GainTable_DT4 <- cumGainsTable(DT_model4_prob[,2], test$Target, resolution = 1/100)
+GainTable_DT5 <- cumGainsTable(DT_model5_prob[,2], test$Target, resolution = 1/100)
+
+# draw the plot
+plot(GainTable_DT1[,4], col="red", type="l", xlab="Percentage of test instances", ylab="Percentage of identified invalid claims") 
+lines(GainTable_DT2[,4], col="blue", type="l")
+lines(GainTable_DT3[,4], col="green", type="l")
+lines(GainTable_DT4[,4], col="yellow", type="l")
+lines(GainTable_DT5[,4], col="pink", type="l")
+grid(NULL, lwd = 1)
+
+
+legend("bottomright",
+c("DT1", "DT2", "DT3", "DT4", "DT5"),
+fill=c("red","blue", "green", "yellow", "pink"))
+```
+
+#### SVM gain chart
+```{r}
+# Provide probabilities for the outcome of interest and obtain the gain chart data
+GainTable_SVM1 <- cumGainsTable(SVM_prob1[,2], test$Target, resolution = 1/100)
+GainTable_SVM2 <- cumGainsTable(SVM_prob2[,2], test$Target, resolution = 1/100)
+GainTable_SVM3 <- cumGainsTable(SVM_prob3[,2], test$Target, resolution = 1/100)
+GainTable_SVM4 <- cumGainsTable(SVM_prob4[,2], test$Target, resolution = 1/100)
+GainTable_SVM5 <- cumGainsTable(SVM_prob5[,2], test$Target, resolution = 1/100)
+
+# draw the plot
+plot(GainTable_SVM1[,4], col="red", type="l", xlab="Percentage of test instances", ylab="Percentage of identified invalid claims") 
+lines(GainTable_SVM2[,4], col="blue", type="l")
+lines(GainTable_SVM3[,4], col="green", type="l")
+lines(GainTable_SVM4[,4], col="yellow", type="l")
+lines(GainTable_SVM5[,4], col="pink", type="l")
+grid(NULL, lwd = 1)
+
+legend("bottomright",
+c("SVM1", "SVM2", "SVM3", "SVM4", "SVM5"),
+fill=c("red","blue", "green", "yellow", "pink"))
+```
+
+#### KNN gain chart
+```{r}
+# Provide probabilities for the outcome of interest and obtain the gain chart data
+GainTable_KNN1 <- cumGainsTable(knn_pred_prob1, test$Target, resolution = 1/100)
+GainTable_KNN2 <- cumGainsTable(knn_pred_prob2, test$Target, resolution = 1/100)
+GainTable_KNN3 <- cumGainsTable(knn_pred_prob3, test$Target, resolution = 1/100)
+GainTable_KNN4 <- cumGainsTable(knn_pred_prob4, test$Target, resolution = 1/100)
+GainTable_KNN5 <- cumGainsTable(knn_pred_prob5, test$Target, resolution = 1/100)
+
+# draw the plot
+plot(GainTable_KNN1[,4], col="red", type="l", xlab="Percentage of test instances", ylab="Percentage of identified invalid claims") 
+lines(GainTable_KNN2[,4], col="blue", type="l")
+lines(GainTable_KNN3[,4], col="green", type="l")
+lines(GainTable_KNN4[,4], col="yellow", type="l")
+lines(GainTable_KNN5[,4], col="pink", type="l")
+grid(NULL, lwd = 1)
+
+
+legend("bottomright",
+c("KNN1", "KNN2", "KNN3", "KNN4", "KNN5"),
+fill=c("red","blue", "green", "yellow", "pink"))
+```
+#### XGBOOST Gain Chart
+```{r}
+# Provide probabilities for the outcome of interest and obtain the gain chart data
+GainTable_xgb1 <- cumGainsTable(pred1, test$Target, resolution = 1/100)
+GainTable_xgb2 <- cumGainsTable(pred2, test$Target, resolution = 1/100)
+GainTable_xgb3 <- cumGainsTable(pred3, test$Target, resolution = 1/100)
+GainTable_xgb4 <- cumGainsTable(pred4, test$Target, resolution = 1/100)
+GainTable_xgb5 <- cumGainsTable(pred5, test$Target, resolution = 1/100)
+
+# draw the plot
+plot(GainTable_xgb1[,4], col="red", type="l", xlab="Percentage of test instances", ylab="Percentage of identified invalid claims") 
+lines(GainTable_xgb2[,4], col="blue", type="l")
+lines(GainTable_xgb3[,4], col="green", type="l")
+lines(GainTable_xgb4[,4], col="yellow", type="l")
+lines(GainTable_xgb5[,4], col="pink", type="l")
+grid(NULL, lwd = 1)
+
+
+legend("bottomright",
+c("XGBOOST1", "XGBOOST2", "XGBOOST3", "XGBOOST4", "XGBOOST5"),
+fill=c("red","blue", "green", "yellow", "pink"))
+```
+
+#### Gain chart for all models
+```{r}
+# Plotting for Logistic Regression
+plot(GainTable_Log2[, 4], col="green", type="l",    
+     xlab="Percentage of test instances", ylab="Percentage of identified positive customers")
+# Adding lines for Random Forest
+lines(GainTable_RF2[, 4], col="orange", type="l")
+
+# Adding lines for tuned Random Forest
+lines(GainTable_RF_tuning2[, 4], col="yellow", type = "l")
+
+# Adding lines for Decision Tree
+lines(GainTable_DT2[, 4], col="purple", type="l")
+
+# Adding lines for SVM
+lines(GainTable_SVM2[, 4], col="blue", type="l")
+
+# Adding lines for KNN
+lines(GainTable_KNN2[, 4], col="red", type = "l")
+
+# Adding lines for XGBOOST
+lines(GainTable_xgb2[, 4], col="pink", type = "l")
+
+# Adding a baseline (assuming a random model)
+baseline <- seq(0, 100, length.out = length(GainTable_KNN1[, 4]))
+lines(baseline, col="black", type="l", lty=2) 
+grid(NULL, lwd=1)
+
+legend("bottomright",
+       c("Logistic Regression", "Random Forest", "Tuned Random Forest", "Decision Tree", "SVM", "KNN", "XGBOOST", "Baseline"),
+       fill=c("green", "orange", "yellow", "purple", "blue", "red", "pink", "black"),
+       lty=c(1, 1, 1, 1, 1, 1, 1, 2))
+```
+
+
+### Cumulative gain chart
+```{r}
+# Function to prepare the data frame for each model
+prepare_data <- function(probabilities, true_labels, model_name) {
+  results <- data.frame(probability = probabilities, label = as.numeric(test$Target == "1"))
+  results <- results[order(-results$probability), ]
+  results$cumulative_true_positives <- cumsum(results$label)
+  results$cumulative_gain <- results$cumulative_true_positives / sum(results$label)
+  results$percentage_of_data <- seq_along(results$cumulative_gain) / nrow(results)
+  results$Model <- model_name
+  return(results)
+}
+
+# Prepare data for each model
+data_LogReg <- prepare_data(LogReg_pred2, test$Target, "Logistic Regression")
+data_RF <- prepare_data(RF_pred2, test$Target, "Random Forest")
+data_RF_tuning <- prepare_data(RF_tunedpred2, test$Target, "Random Forest after Tuning")
+data_DT <- prepare_data(DT_predover, test$Target, "Desicion Tree")
+data_SVM <- prepare_data(SVM_pred2, test$Target, "SVM")
+data_KNN <- prepare_data(knn_pred_prob2, test$Target, "KNN")
+data_XGBOOST <- prepare_data(pred2, test$Target, "XGBOOST")
+
+# Combine all data into one data frame
+all_data <- rbind(data_LogReg, data_RF, data_RF_tuning, data_DT, data_SVM, data_KNN, data_XGBOOST) 
+
+# Find the elbow point of KNN
+## Find the index where the cumulative gain first reaches or exceeds 0.9
+gain_threshold <- 0.9
+index_at_gain <- which(results$cumulative_gain >= gain_threshold)[1]
+# Find the corresponding percentage of test instances
+if (!is.na(index_at_gain)) {
+  percentage_at_gain <- results$percentage_of_data[index_at_gain]
+} else {
+  # If no exact 0.9 gain is found, you can interpolate to estimate
+  percentage_at_gain <- approx(x = results$cumulative_gain, y = results$percentage_of_data, xout = gain_threshold)$y
+}
+
+elbow_point <- percentage_at_gain
+
+# Plot the cumulative gains chart for all models
+ggplot(all_data, aes(x = percentage_of_data, y = cumulative_gain, color = Model)) +
+  geom_line() +
+  geom_vline(xintercept = percentage_at_gain, color="red", linetype="dashed") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray") + 
+  xlab("Percentage of Test Instances") +
+  ylab("Cumulative Gain") +
+  ggtitle("Cumulative Gains Chart")+
+  theme_minimal() +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text = element_text(color = "black"),
+        plot.title = element_text(hjust = 0.5))
+
+```
+
